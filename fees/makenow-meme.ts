@@ -1,3 +1,4 @@
+import ADDRESSES from '../helpers/coreAssets.json'
 import { FetchOptions, SimpleAdapter } from "../adapters/types"
 import { CHAIN } from "../helpers/chains"
 import { queryDuneSql } from "../helpers/dune"
@@ -7,7 +8,7 @@ import { queryDuneSql } from "../helpers/dune"
 // https://solscan.io/account/AEBoqzQU3fDYzhVmaRedcNeVcQQSMEqCAuQ2A7pYNEd7
 
 
-const fetchFees = async (_a:any, _b:any, options: FetchOptions) => {
+const fetchFees = async (_a: any, _b: any, options: FetchOptions) => {
   const targets = [
     // Swap fee receivers
     '8tA49tvPiTCkeVfuTms1F2nwVg6FWpQsQ8eNZ4g9vVQF',
@@ -50,7 +51,7 @@ const fetchFees = async (_a:any, _b:any, options: FetchOptions) => {
     FROM tokens_solana.transfers
     WHERE (
       (to_owner IN (${formattedAddresses})) OR
-      (to_owner IS NULL AND token_mint_address = 'So11111111111111111111111111111111111111112' AND tx_signer IN (${formattedAddresses}))
+      (to_owner IS NULL AND token_mint_address = '${ADDRESSES.solana.SOL}' AND tx_signer IN (${formattedAddresses}))
     )
       AND from_owner NOT IN (${formattedBlacklist})
       AND tx_id NOT IN (${formattedBlacklistTxnIds})
@@ -62,7 +63,7 @@ const fetchFees = async (_a:any, _b:any, options: FetchOptions) => {
 
   const dailyFees = options.createBalances();
   for (const row of res) {
-    dailyFees.add(row.mint, row.total_amount );
+    dailyFees.add(row.mint, row.total_amount);
   }
 
   return { dailyFees, dailyRevenue: dailyFees, dailyProtocolRevenue: dailyFees, }
@@ -74,16 +75,14 @@ const adapters: SimpleAdapter = {
     [CHAIN.SOLANA]: {
       fetch: fetchFees,
       start: '2022-09-14',
-      meta: {
-        methodology: {
-          Fees: "Tokens trading and launching fees paid by users.",
-          Revenue: "All fees are revenue.",
-          ProtocolRevenue: "All revenue collected by protocol.",
-        }
-      }
     }
   },
   isExpensiveAdapter: true,
+  methodology: {
+    Fees: "Tokens trading and launching fees paid by users.",
+    Revenue: "All fees are revenue.",
+    ProtocolRevenue: "All revenue collected by protocol.",
+  }
 }
 
 export default adapters

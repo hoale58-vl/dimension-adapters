@@ -13,7 +13,7 @@ const config = {
 	},
 }
 
-const fetchFees = async (_a: any, _b: any, options: FetchOptions): Promise<FetchResult> => {
+const fetch = async (_a: any, _b: any, options: FetchOptions): Promise<FetchResult> => {
 	const { createBalances } = options;
 
 	const dailyFees = createBalances();
@@ -114,14 +114,12 @@ const adapter: SimpleAdapter = {
 	adapter: Object.keys(config).reduce((acc, chain) => {
 		const { start } = config[chain];
 		acc[chain] = {
-			fetch: fetchFees,
+			fetch,
 			start: start,
-			meta: {
-				methodology
-			}
 		};
 		return acc;
 	}, {}),
+	methodology,
 };
 
 export default adapter;
