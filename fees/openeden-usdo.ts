@@ -1,36 +1,48 @@
 import { FetchOptions, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
 import { METRIC } from "../helpers/metrics";
-import { addTokensReceived } from "../helpers/token";
+import CoreAssets from "../helpers/coreAssets.json";
 
 interface OpenEdenConfig {
   USDO: string;
+  USDC: string;
+  managerContract: string;
   mintRedeemFeesWallets: Array<string>;
 }
 
 const configs: Record<string, OpenEdenConfig> = {
   [CHAIN.ETHEREUM]: {
     USDO: '0x8238884Ec9668Ef77B90C6dfF4D1a9F4F4823BFe',
+    USDC: CoreAssets.ethereum.USDC,
+    managerContract: '0x80e49d1bdce8f80c38e88dd5c4c004ddb9b4e887',
     mintRedeemFeesWallets: ['0x5bcdd6b1FC9f8488503D86e9f73172eFDD69533F',]
   },
   [CHAIN.BASE]: {
     USDO: '0xad55aebc9b8c03fc43cd9f62260391c13c23e7c0',
+    USDC: CoreAssets.base.USDC,
+    managerContract: '0x5076f96169d7cC15AFc084c60C68182C8F1732a7',
     mintRedeemFeesWallets: ['0xEC005b31d329d17cAF2b72E30d2Aa95462bE956d'],
   }
 }
 
 // https://docs.openeden.com/tbill/fees#total-expense-ratio
-const MANAGERMENT_FEES_RATE = 0.003; // 0.3% per year
+const MANAGEMENT_FEES_RATE = 0.003; // 0.3% per year
 
 const fetch = async (options: FetchOptions) => {
   const dailyMintRedeemFees = options.createBalances();
   
-  // -- mint/redeeem fees
-  await addTokensReceived({
-    balances: dailyMintRedeemFees,
-    options,
-    targets: configs[options.chain].mintRedeemFeesWallets,
+  const mintEvents = await options.getLogs({
+    target: configs[options.chain].managerContract,
+    eventAbi: 'event InstantMint (address indexed underlying, address indexed from, address indexed to, uint256 reqAmt, uint256 receiveAmt, uint256 fee)',
   })
+  const redeemEvents = await options.getLogs({
+    target: configs[options.chain].managerContract,
+    eventAbi: 'event ProcessRedeem (address indexed from, address indexed to, uint256 usdoAmt, uint256 usdcAmt, uint256 fee, bytes32 id)',
+  })
+  
+  for (const event of mintEvents.concat(redeemEvents)) {
+    dailyMintRedeemFees.add(configs[options.chain].USDC, event.fee)
+  }
 
   const dailyFees = dailyMintRedeemFees.clone(1, METRIC.MINT_REDEEM_FEES)
   const dailyUserFees = dailyMintRedeemFees.clone(1, METRIC.MINT_REDEEM_FEES)
@@ -43,10 +55,10 @@ const fetch = async (options: FetchOptions) => {
   })
 
   const currentPeriod = options.toTimestamp - options.fromTimestamp
-  const managementFees = Number(totalSupply) * MANAGERMENT_FEES_RATE * currentPeriod / (365 * 24 * 3600)
+  const managementFees = Number(totalSupply) * MANAGEMENT_FEES_RATE * currentPeriod / (365 * 24 * 3600)
 
-  dailyFees.add(configs[options.chain].USDO, managementFees, METRIC.MANAGERMENT_FEES)
-  dailyRevenue.add(configs[options.chain].USDO, managementFees, METRIC.MANAGERMENT_FEES)
+  dailyFees.add(configs[options.chain].USDO, managementFees, METRIC.MANAGEMENT_FEES)
+  dailyRevenue.add(configs[options.chain].USDO, managementFees, METRIC.MANAGEMENT_FEES)
 
   // -- yields distributed to USDO holders via rebasing
   const rateBefore = await options.fromApi.call({
@@ -64,7 +76,7 @@ const fetch = async (options: FetchOptions) => {
   const dailySupplySideRevenue = options.createBalances()
   dailyFees.add(configs[options.chain].USDO, yieldCollected, METRIC.ASSETS_YIELDS)
   dailySupplySideRevenue.add(configs[options.chain].USDO, yieldCollected, METRIC.ASSETS_YIELDS)
-
+  
   return {
     dailyFees,
     dailyUserFees,
@@ -86,18 +98,18 @@ const breakdownMethodology = {
   Fees: {
     [METRIC.ASSETS_YIELDS]: 'USDO backing assets yields from all investments.',
     [METRIC.MINT_REDEEM_FEES]: 'Fees from mint/redeem USDO.',
-    [METRIC.MANAGERMENT_FEES]: '0.3% annual management fees.',
+    [METRIC.MANAGEMENT_FEES]: '0.3% annual management fees.',
   },
   UserFees: {
     [METRIC.MINT_REDEEM_FEES]: 'Users pay fees when mint/redeem USDO.',
   },
   Revenue: {
     [METRIC.MINT_REDEEM_FEES]: 'Fees from mint/redeem USDO.',
-    [METRIC.MANAGERMENT_FEES]: '0.3% annual management fees.',
+    [METRIC.MANAGEMENT_FEES]: '0.3% annual management fees.',
   },
   ProtocolRevenue: {
     [METRIC.MINT_REDEEM_FEES]: 'Fees from mint/redeem USDO.',
-    [METRIC.MANAGERMENT_FEES]: '0.3% annual management fees.',
+    [METRIC.MANAGEMENT_FEES]: '0.3% annual management fees.',
   },
   SupplySideRevenue: {
     [METRIC.ASSETS_YIELDS]: 'USDO backing assets yields from all investments.',
@@ -106,6 +118,7 @@ const breakdownMethodology = {
 
 const adapter: SimpleAdapter = {
   version: 2,
+  pullHourly: true,
   methodology,
   breakdownMethodology,
   fetch,

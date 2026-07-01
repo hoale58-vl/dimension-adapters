@@ -1,8 +1,8 @@
-import { Adapter, FetchOptions } from "../../adapters/types";
+import { Adapter, Dependencies, FetchOptions } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { queryDuneSql } from "../../helpers/dune";
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const volumeRes = await queryDuneSql(options, `
         select
             SUM(amount_usd) as volume
@@ -31,12 +31,10 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: Adapter = {
     version: 1,
-    adapter: {
-        [CHAIN.UNICHAIN]: {
-            fetch: fetch as any,
-            start: '2025-05-29'
-        },
-    },
+    dependencies: [Dependencies.DUNE],
+    fetch,
+    chains: [CHAIN.UNICHAIN],
+    start: '2025-05-29',
     isExpensiveAdapter: true
 }
 

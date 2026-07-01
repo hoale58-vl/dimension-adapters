@@ -1,7 +1,7 @@
 import { Interface } from "ethers";
 import { FetchOptions, FetchResultVolume, SimpleAdapter } from "../../adapters/types";
 import { SocketVaults } from "./contracts";
-import { normalizeAddress } from "@defillama/sdk/build/util";
+import * as sdk from '@defillama/sdk'
 
 const SocketVaultAbis = {
   TokensDeposited: 'event TokensDeposited(address connector, address depositor, address receiver, uint256 depositAmount)',
@@ -11,9 +11,11 @@ const SocketVaultAbis = {
 }
 
 export function getToken(chain: string, vaultAddress: string): string | null {
+  vaultAddress = sdk.util.normalizeAddress(vaultAddress)
+  
   if (SocketVaults[chain]) {
     for (const [vault, token] of Object.entries(SocketVaults[chain])) {
-      if (normalizeAddress(vault) === normalizeAddress(vaultAddress)) {
+      if (sdk.util.normalizeAddress(vault) === vaultAddress) {
         return token;
       }
     }
@@ -105,6 +107,7 @@ const fetch: any = async (options: FetchOptions): Promise<FetchResultVolume> => 
 
 const adapter: SimpleAdapter = {
   version: 2,
+  pullHourly: true,
   adapter: Object.keys(SocketVaults).reduce((acc, chain) => {
     return {
       ...acc,

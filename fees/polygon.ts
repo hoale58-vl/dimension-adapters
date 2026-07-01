@@ -1,9 +1,9 @@
 import { CHAIN } from "../helpers/chains";
-import { Adapter, ProtocolType, FetchOptions } from "../adapters/types";
+import { Adapter, ProtocolType, FetchOptions, Dependencies } from "../adapters/types";
 import { queryDuneSql } from "../helpers/dune";
 
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const dailyFees = options.createBalances();
 
     const query = `
@@ -45,12 +45,10 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: Adapter = {
     version: 1,
-    adapter: {
-        [CHAIN.POLYGON]: {
-            fetch,
-            start: '2020-05-30',
-        },
-    },
+    fetch,
+    chains: [CHAIN.POLYGON],
+    start: '2020-05-30',
+    dependencies: [Dependencies.DUNE],
     protocolType: ProtocolType.CHAIN,
     isExpensiveAdapter: true,
     allowNegativeValue: true, // L1 Costs

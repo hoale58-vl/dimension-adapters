@@ -22,6 +22,7 @@ const endpoints: Record<Chain, string> = {
   [CHAIN.SONIC]: sdk.graph.modifyEndpoint('7dkVEmyCHvjnYYUJ9DR1t2skkZrdbfSWpK6wpMbF9CEk'),
   [CHAIN.BERACHAIN]: sdk.graph.modifyEndpoint('FGF5X13mGLYu2GN7pK4LYuMeS95WENHAgPDP8JDCJyTy'),
   [CHAIN.HYPERLIQUID]: "https://woofi-subgraph.mer1in.com/subgraphs/name/woonetwork/woofi-hyperevm",
+  [CHAIN.MONAD]: sdk.graph.modifyEndpoint('B5oecz9PHofaQmUMP8ws2iYsNTxXhEtcghsA2jMSsJAP'),
 };
 
 type TStartTime = {
@@ -43,6 +44,7 @@ const startTime: TStartTime = {
   [CHAIN.BERACHAIN]: 1742256000,
   [CHAIN.SOLANA]: 1740528000,
   [CHAIN.HYPERLIQUID]: 1751328000,
+  [CHAIN.MONAD]: 1764201600,
 };
 
 interface FetchResult {
@@ -53,7 +55,7 @@ interface FetchResult {
     totalVolumeUSD: string;
   }>
 }
-const fetchVolume = async (_t: any, _c: any,options: FetchOptions) => {
+const fetchVolume = async (options: FetchOptions) => {
   const start = getTimestampAtStartOfDayUTC(options.endTimestamp)
   const dateId = Math.floor(start / 86400);
   const query = gql`
@@ -73,16 +75,15 @@ const fetchVolume = async (_t: any, _c: any,options: FetchOptions) => {
   }
 }
 
-const fetchSolanaVolume = async (timestamp: number) => {
+const fetchSolanaVolume = async (options: FetchOptions) => {
   const apiURL = "https://api.woofi.com/stat?period=all&network=solana";
   const response = await httpGet(apiURL);
 
-  const startOfDayUTC = getTimestampAtStartOfDayUTC(timestamp);
+  const startOfDayUTC = getTimestampAtStartOfDayUTC(options.toTimestamp);
 
   const result = response?.data?.find((item) => item.timestamp === startOfDayUTC.toString());
 
   return {
-    timestamp: timestamp,
     dailyVolume: result ? Number(result.volume_usd) / 1e18 : 0,
   }
 }

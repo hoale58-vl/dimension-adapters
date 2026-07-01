@@ -1,8 +1,8 @@
-import { FetchOptions, SimpleAdapter } from "../adapters/types";
+import { Dependencies, FetchOptions, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
 import { queryDuneSql } from "../helpers/dune";
 
-const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch: any = async (options: FetchOptions) => {
 
   // Query to track volume by decoding TokenBuyExactIn and TokenSellExactIn events
   // Program address: waveQX2yP3H1pVU8djGvEHmYg8uamQ84AuyGtpsrXTF
@@ -22,6 +22,7 @@ const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
       WHERE executing_account = 'waveQX2yP3H1pVU8djGvEHmYg8uamQ84AuyGtpsrXTF'
         AND block_time >= from_unixtime(${options.startTimestamp})
         AND block_time <= from_unixtime(${options.endTimestamp})
+        AND tx_success = true
         AND (
           bytearray_substring(data, 1, 1) = from_hex('08') OR  -- TokenBuyExactIn
           bytearray_substring(data, 1, 1) = from_hex('0a')     -- TokenSellExactIn
@@ -87,12 +88,10 @@ const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: SimpleAdapter = {
   version: 1,
-  adapter: {
-    [CHAIN.SOLANA]: {
-      fetch,
-      start: '2025-05-27',
-    },
-  },
+  dependencies: [Dependencies.DUNE],
+  fetch,
+  chains: [CHAIN.SOLANA],
+  start: '2025-05-27',
   isExpensiveAdapter: true
 };
 

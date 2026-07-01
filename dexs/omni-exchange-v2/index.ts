@@ -19,8 +19,12 @@ const v2_SUBGRAPHS: Record<string, { graph: string, start: string }> = {
     graph: "https://api.goldsky.com/api/public/project_cltceeuudv1ij01x7ekxhfl46/subgraphs/omni-v2-avalanche/prod/gn",
     start: '2023-01-01'
   },
-  [CHAIN.SONIC]: {
-    graph: "https://api.goldsky.com/api/public/project_cltceeuudv1ij01x7ekxhfl46/subgraphs/omni-v2-sonic/prod/gn",
+  // [CHAIN.SONIC]: {
+  //   graph: "https://api.goldsky.com/api/public/project_cltceeuudv1ij01x7ekxhfl46/subgraphs/omni-v2-sonic/prod/gn",
+  //   start: '2023-01-01'
+  // },
+  [CHAIN.PLASMA]: {
+    graph: "https://api.goldsky.com/api/public/project_cltceeuudv1ij01x7ekxhfl46/subgraphs/omni-v2-plasma/prod/gn",
     start: '2023-01-01'
   },
   [CHAIN.BSC]: {
@@ -51,7 +55,7 @@ const V3_CLAMM_BIN_QUERY = gql`
   }
 `;
 
-const fetch = async (_a:any, _b:any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
   const chain = options.chain;
   const startTimestamp = options.startTimestamp;
   const dateId = Math.floor(startTimestamp / 86400);

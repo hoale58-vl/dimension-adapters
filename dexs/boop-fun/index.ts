@@ -1,4 +1,4 @@
-import { SimpleAdapter } from "../../adapters/types";
+import { Dependencies, SimpleAdapter } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { queryDuneSql } from "../../helpers/dune";
 import { FetchOptions } from "../../adapters/types";
@@ -7,7 +7,7 @@ interface IData {
     total_volume: number;
 }
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const data: IData[] = await queryDuneSql(options, `
         WITH buy_volume AS (
             SELECT
@@ -41,6 +41,7 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: SimpleAdapter = {
     fetch,
+    dependencies: [Dependencies.DUNE],
     chains: [CHAIN.SOLANA],
     start: '2025-05-01',
     isExpensiveAdapter: true

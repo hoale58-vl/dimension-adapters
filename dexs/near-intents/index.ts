@@ -1,33 +1,33 @@
-import type { FetchOptions, SimpleAdapter } from "../../adapters/types";
+import { Dependencies, FetchOptions, FetchResult, SimpleAdapter } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
-import { httpGet } from "../../utils/fetchURL";
+import { queryDuneSql } from "../../helpers/dune";
 
-interface ApiResponse {
-  DATE: string;
-  GROSS_AMOUNT_USD: number;
-}
-let data
-const api = "https://app.near-intents.org/api/stats/trading_volume"
+const fetch = async (options: FetchOptions): Promise<FetchResult> => {
+  const duneQuery = `
+    SELECT
+      sum(CAST(volume_amount_usd AS DOUBLE)) AS daily_volume
+    FROM
+      dune.near.dataset_near_intents_metrics
+    WHERE
+      date_at = '${options.dateString}'
+  `;
+  const queryResult = await queryDuneSql(options, duneQuery);
+
+  const dailyVolume = options.createBalances();
+  dailyVolume.addUSDValue(queryResult[0].daily_volume);
+
+  return {
+    dailyVolume,
+  };
+};
 
 const adapter: SimpleAdapter = {
-  adapter: {
-    [CHAIN.NEAR]: {
-      start: '2024-11-05',
-      fetch: async (_ts, _t: any, options: FetchOptions) => {
-        if (!data) data = httpGet(api)
-        const dailyVolume = (await data).find((t: ApiResponse) => {
-          const recordDate = t.DATE.split(' ')[0]
-          return recordDate === options.dateString
-        })?.GROSS_AMOUNT_USD
-        if (!dailyVolume || Number(dailyVolume) < 0 || Number((dailyVolume)) > 50_000_000_000) {
-          throw new Error(`Invalid daily volume: ${dailyVolume} for date ${options.dateString}`);
-        }
-        return {
-          dailyVolume: dailyVolume
-        }
-      }
-    }
-  }
+  version: 1,
+  fetch,
+  chains: [CHAIN.NEAR],
+  start: "2024-11-05",
+  dependencies: [Dependencies.DUNE],
+  isExpensiveAdapter: true,
 };
 
 export default adapter;

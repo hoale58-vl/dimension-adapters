@@ -1,8 +1,8 @@
-import { httpGet } from "../../utils/fetchURL";
+import { FetchOptions, SimpleAdapter } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
-import { FetchOptions } from "../../adapters/types";
+import { httpGet } from "../../utils/fetchURL";
 
-const chainConfig: Record<string, { id: number, start: string }> = {
+const chainConfig: Record<string, { id: number, start: string, deadFrom?: string }> = {
   [CHAIN.ETHEREUM]: { id: 1, start: '2021-06-01' },
   [CHAIN.ARBITRUM]: { id: 42161, start: '2021-09-22' },
   [CHAIN.AVAX]: { id: 43114, start: '2021-06-01' },
@@ -15,7 +15,7 @@ const chainConfig: Record<string, { id: number, start: string }> = {
   // [CHAIN.ERA]: {id: 324, start: '2023-03-24'},
   // [CHAIN.CRONOS]: { id: 25, start: '2021-06-01' },
   [CHAIN.BASE]: { id: 8453, start: '2023-08-09' },
-  [CHAIN.MANTLE]: { id: 5000, start: '2023-07-17' },
+  [CHAIN.MANTLE]: { id: 5000, start: '2023-07-17', deadFrom: '2026-02-16' },
   // [CHAIN.BLAST]: {id: 81457, start: '2024-02-29'},
   // [CHAIN.POLYGON_ZKEVM]: { id: 1101, start: '2023-03-27' },
   // [CHAIN.BITTORRENT]: {id: 199, start: '2021-06-01'},
@@ -23,23 +23,21 @@ const chainConfig: Record<string, { id: number, start: string }> = {
   [CHAIN.BERACHAIN]: { id: 80094, start: '2025-02-06' },
   [CHAIN.UNICHAIN]: { id: 130, start: '2025-02-11' },
   [CHAIN.HYPERLIQUID]: { id: 999, start: '2025-07-09' },
+  [CHAIN.PLASMA]: { id: 9745, start: '2025-09-24' },
+  [CHAIN.ETHERLINK]: { id: 42793, start: '2025-10-02', deadFrom: '2026-02-16' },
+  [CHAIN.MONAD]: { id: 143, start: '2025-11-23' },
+  [CHAIN.MEGAETH]: { id: 4326, start: '2026-02-09' },
 };
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
-  const url = `https://common-service.kyberswap.com/api/v1/aggregator/volume/daily?chainId=${chainConfig[options.chain].id
-    }&timestamps=${options.startOfDay}`;
-  const data = (
-    await httpGet(url, {
-      headers: { origin: "https://common-service.kyberswap.com" },
-    })
-  ).data?.volumes?.[0];
+const fetch = async (options: FetchOptions) => {
+  const headers = { origin: "https://common-service.kyberswap.com" };
+  const url = `https://common-service.kyberswap.com/api/v1/aggregator/volume/daily?chainId=${chainConfig[options.chain].id}&timestamps=${options.startOfDay}`;
+  const dailyVolume = (await httpGet(url, { headers })).data?.volumes?.[0].value;
 
-  return {
-    dailyVolume: data.value,
-  };
+  return { dailyVolume };
 };
 
-const adapter = {
+const adapter: SimpleAdapter = {
   version: 1,
   fetch,
   adapter: chainConfig

@@ -1,10 +1,10 @@
 import ADDRESSES from '../helpers/coreAssets.json'
-import { FetchOptions, SimpleAdapter } from "../adapters/types";
+import { Dependencies, FetchOptions, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
 import { queryDuneSql } from "../helpers/dune";
 import { getETHReceived } from "../helpers/token";
 
-const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch: any = async (options: FetchOptions) => {
   const query = `
   WITH sol_payments_total AS (
       SELECT
@@ -69,23 +69,20 @@ const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
   const data = await queryDuneSql(options, query);
   const dailyFees = options.createBalances();
   dailyFees.addCGToken('solana', data[0].revenue);
-  return { dailyFees: dailyFees }
+  return { dailyFees, dailyRevenue: dailyFees, dailyProtocolRevenue: dailyFees }
 }
 
 // https://docs.bloxroute.com/bsc-and-eth/apis/transaction-bundles/bundle-submission/bsc-bundle-submission
-const fetchBSC: any = async (_a: any, _b: any, options: FetchOptions) => {
+const fetchBSC: any = async (options: FetchOptions) => {
   const dailyFees = await getETHReceived({
     options,
     target: '0x74c5F8C6ffe41AD4789602BDB9a48E6Cad623520',
   })
-  return { dailyFees }
+  return { dailyFees, dailyRevenue: dailyFees, dailyProtocolRevenue: dailyFees }
 }
 
 const adapter: SimpleAdapter = {
   version: 1,
-  methodology: {
-    Fees: "mev fees to blocXroute, substracted routed jito mev fees to prevent double counting",
-  },
   adapter: {
     [CHAIN.SOLANA]: {
       fetch: fetch,
@@ -95,7 +92,13 @@ const adapter: SimpleAdapter = {
       start: '2024-04-15',
     }
   },
-  isExpensiveAdapter: true
+  isExpensiveAdapter: true,
+  dependencies: [Dependencies.DUNE, Dependencies.ALLIUM],
+  methodology: {
+    Fees: "mev fees to blocXroute, subtracted routed jito mev fees to prevent double counting",
+    Revenue: "All MEV fees are kept by bloXroute as protocol revenue.",
+    ProtocolRevenue: "All MEV fees are kept by bloXroute as protocol revenue.",
+  }
 };
 
 export default adapter;

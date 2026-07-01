@@ -3,7 +3,7 @@ import { LifiDiamonds, fetchVolumeFromLIFIAPI } from "../../helpers/aggregators/
 import { CHAIN } from "../../helpers/chains";
 
 const LifiBridgeEvent = "event LiFiTransferStarted((bytes32 transactionId, string bridge, string integrator, address referrer, address sendingAssetId, address receiver, uint256 minAmount, uint256 destinationChainId, bool hasSourceSwaps, bool hasDestinationCall) bridgeData)"
-const integrators = ['jumper.exchange', 'transferto.xyz', 'jumper.exchange.gas']
+const integrators = ['jumper.exchange', 'transferto.xyz', 'jumper.exchange.gas','lifi-gasless-jumper']
 
 const fetch: any = async (options: FetchOptions): Promise<FetchResultVolume> => {
   if (options.chain === CHAIN.BITCOIN || options.chain === CHAIN.SOLANA) {
@@ -31,6 +31,7 @@ const fetch: any = async (options: FetchOptions): Promise<FetchResultVolume> => 
 
 const adapter: SimpleAdapter = {
   version: 2,
+  pullHourly: true,
   adapter: Object.keys(LifiDiamonds).reduce((acc, chain) => {
     return {
       ...acc,

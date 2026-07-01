@@ -1,4 +1,4 @@
-import { FetchOptions, SimpleAdapter } from "../adapters/types";
+import { Dependencies, FetchOptions, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
 import { getETHReceived, getSolanaReceived } from "../helpers/token";
 
@@ -14,24 +14,34 @@ const solana_fee_wallet_addresses = [
   'D1NJy3Qq3RKBG29EDRj28ozbGwnhmM5yBUp8PonSYUnm',
 ];
 
+const solana_blacklist_mints = [
+  'DWxU1Ew5yjFebSui8xzRYPE3FwgGzp8F1iKcQFyUezJX',
+  '2xaPstY4XqJ2gUA1mpph3XmvmPZGuTuJ658AeqX3gJ6F',
+  'Dsx5h4jk8vyQjd8B9JF9cydNTz87KgPqUG2QCGH9PjCh',
+];
+
 // ETH fee wallet addresses
 const eth_fee_wallet_addresses = [
   '0x1bcc58d165e5374d7b492b21c0a572fd61c0c2a0',
-  '0x7afa9d836d2fccf172b66622625e56404e465dbd'
+  '0x7afa9d836d2fccf172b66622625e56404e465dbd',
+  '0x2cffed5d56eb6a17662756ca0fdf350e732c9818',
 ];
 
 // Solana fetch function
-const fetchSolana = async (_a: any, _b: any, options: FetchOptions) => {
-  const dailyFees = await getSolanaReceived({ 
-    options, 
-    targets: solana_fee_wallet_addresses, 
-    blacklist_signers: solana_fee_wallet_addresses 
+const fetchSolana = async (options: FetchOptions) => {
+  // throw new Error('Fix bug that inflates fees')
+  const dailyFees = await getSolanaReceived({
+    options,
+    targets: solana_fee_wallet_addresses,
+    blacklist_signers: solana_fee_wallet_addresses,
+    blacklist_mints: solana_blacklist_mints,
   });
   return { dailyFees, dailyRevenue: dailyFees, dailyProtocolRevenue: dailyFees };
 };
 
 // ETH fetch function for each chain
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
+  // throw new Error('Fix bug that inflates fees')
   const dailyFees = await getETHReceived({
     options,
     targets: eth_fee_wallet_addresses,
@@ -53,13 +63,16 @@ const methodology = {
 }
 
 const adapter: SimpleAdapter = {
-  version: 1,
+  version: 2,
+  pullHourly: true,
+  dependencies: [Dependencies.ALLIUM],
   methodology,
   adapter: {
     [CHAIN.SOLANA]: { fetch: fetchSolana },
     [CHAIN.ETHEREUM]: { fetch },
     [CHAIN.BASE]: { fetch },
     [CHAIN.POLYGON]: { fetch },
+    [CHAIN.MONAD]: { fetch },
   },
   isExpensiveAdapter: true
 };

@@ -1,8 +1,8 @@
-import { FetchOptions, SimpleAdapter } from '../../adapters/types';
+import { Dependencies, FetchOptions, SimpleAdapter } from '../../adapters/types';
 import { CHAIN } from '../../helpers/chains';
 import { queryDuneSql } from '../../helpers/dune';
 
-const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch: any = async (options: FetchOptions) => {
 
   const query = `
       WITH buy_instructions AS (
@@ -100,6 +100,7 @@ const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
 const adapter: SimpleAdapter = {
   version: 1,
   fetch,
+  dependencies: [Dependencies.DUNE],
   chains: [CHAIN.SOLANA],
   start: '2025-08-13',
   isExpensiveAdapter: true,

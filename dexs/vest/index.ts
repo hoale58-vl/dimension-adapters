@@ -1,8 +1,6 @@
 import {CHAIN} from "../../helpers/chains";
 import {FetchResultVolume, SimpleAdapter} from "../../adapters/types";
-import {getUniqStartOfTodayTimestamp} from "../../helpers/getUniSubgraphVolume";
 import fetchURL from "../../utils/fetchURL"
-import { FetchOptions } from "../../adapters/types";
 
 const tickers_endpoint = 'https://server-prod.hz.vestmarkets.com/v2/ticker/24hr'
 
@@ -24,7 +22,7 @@ const fetch = async (): Promise<FetchResultVolume> => {
 const adapter: SimpleAdapter = {
     version: 2,
     adapter: {
-        [CHAIN.BASE]: {
+        [CHAIN.OFF_CHAIN]: {
             fetch,
             runAtCurrTime: true,
             start: '2025-01-01',

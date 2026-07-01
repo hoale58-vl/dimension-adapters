@@ -64,7 +64,7 @@ async function getBlock(timestamp: number, chain: Chain, chainBlocks = {} as Cha
     if (block) chainBlocks[chain] = block
     return block
   } catch (e) {
-    console.error('error fetching block' + chain + ' ' + (e as any)?.message)
+    console.log('error fetching block' + chain + ' ' + (e as any)?.message)
     return null
   }
 }
@@ -118,7 +118,7 @@ async function getBlocks(chain: Chain, timestamps: number[]) {
 const canGetBlock = (chain: string) => Object.keys(sdk.api2.config.providers).includes(chain)
 
 async function getHydrationBlock(unixTs: number) {
-  const data = await httpPost('https://hydradx.api.subscan.io/api/scan/block', {
+  const data = await httpPost('https://hydration.api.subscan.io/api/scan/block', {
     "block_timestamp": unixTs,
     "only_head": true
   })

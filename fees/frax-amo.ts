@@ -21,7 +21,7 @@ const query = (amo: string) => gql`
 `;
 
 const getGQLClient = (endpoint: string) => new GraphQLClient(endpoint);
-const fetch = async (timestamp: number, _: any, options: FetchOptions): Promise<FetchResult> => {
+const fetch = async (options: FetchOptions): Promise<FetchResult> => {
   const { amos, graph, FRAX } = config[options.chain];
   const client = getGQLClient(graph);
   const dailyFees = options.createBalances();
@@ -45,9 +45,8 @@ const fetch = async (timestamp: number, _: any, options: FetchOptions): Promise<
   dailySupplySideRevenue.subtract(dailyProtocolRevenue)
 
   return {
-    timestamp,
     dailyFees,
-    dailyRevenue: dailyFees,
+    dailyRevenue: dailyProtocolRevenue,
     dailyProtocolRevenue: dailyProtocolRevenue,
     dailySupplySideRevenue: dailySupplySideRevenue,
   };
@@ -90,7 +89,7 @@ const adapter: SimpleAdapter = {
   version: 1,
   methodology: {
     Fees: 'Total interest paid to users by borrowing FRAX.',
-    Revenue: 'Total interest paid to users by borrowing FRAX.',
+    Revenue: 'Amount of interest collected by Frax Finance.',
     ProtocolRevenue: 'Amount of interest collected by Frax Finance.',
     SupplySideRevenue: 'Amount of interest paid to lenders.',
   }

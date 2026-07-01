@@ -21,6 +21,12 @@ interface SwapEventArgs {
   revenueCut: bigint;
 }
 
+const FLUID_DEX_METRICS = {
+  SwapFees: METRIC.SWAP_FEES,
+  SwapFeesToSuppliers: 'Swap Fees To LPs',
+  SwapFeesToTreasury: 'Swap Fees To Treasury',
+}
+
 const dexReservesResolver = (chain: string) => {
   switch (chain) {
     case CHAIN.ETHEREUM: 
@@ -31,6 +37,8 @@ const dexReservesResolver = (chain: string) => {
       return "0xA508fd16Bf3391Fb555cce478C616BDe4a613052";
     case CHAIN.BASE: 
       return "0x160ffC75904515f38C9b7Ed488e1F5A43CE71eBA";
+    case CHAIN.PLASMA: 
+      return "0x2e28FBdE85512086bF2f61477274646c06b2032b";
     default: 
       throw new Error("DexReservesResolver not defined");
   }
@@ -46,6 +54,8 @@ const dexResolver = (chain: string) => {
       return "0xa17798d03bB563c618b9C44cAd937340Bad99138";
     case CHAIN.BASE: 
       return "0x93f587618A5380f40329E652f8D26CB16dAE3a47";
+    case CHAIN.PLASMA: 
+      return "0x851ab045dFD8f3297a11401110d31Fa9191b0E04";
     default: 
       throw new Error("DexResolver not defined");
   }
@@ -82,7 +92,7 @@ const fetch = async ({ api, createBalances, getLogs }: FetchOptions): Promise<Fe
         eventAbi: abi.swap,
       });
       
-      return logs.map(log => ({
+      return logs.map((log: any) => ({
         swap0to1: log[0] as boolean,
         amountIn: log[1] as bigint,
         amountOut: log[2] as bigint,
@@ -102,12 +112,12 @@ const fetch = async ({ api, createBalances, getLogs }: FetchOptions): Promise<Fe
       const revenueCollected = feesCollected * revenueCut / 100n
       if (isSwap0to1) {
         dailyVolume.add(token0, amountIn);
-        dailyFees.add(token0, feesCollected, METRIC.SWAP_FEES);
-        dailyRevenue.add(token0, revenueCollected, METRIC.SWAP_FEES);
+        dailyFees.add(token0, feesCollected, FLUID_DEX_METRICS.SwapFees);
+        dailyRevenue.add(token0, revenueCollected, FLUID_DEX_METRICS.SwapFeesToTreasury);
       } else {
         dailyVolume.add(token1, amountIn);
-        dailyFees.add(token1, feesCollected, METRIC.SWAP_FEES);
-        dailyRevenue.add(token1, revenueCollected, METRIC.SWAP_FEES);
+        dailyFees.add(token1, feesCollected, FLUID_DEX_METRICS.SwapFees);
+        dailyRevenue.add(token1, revenueCollected, FLUID_DEX_METRICS.SwapFeesToTreasury);
       }
     });
   };
@@ -115,8 +125,8 @@ const fetch = async ({ api, createBalances, getLogs }: FetchOptions): Promise<Fe
   processSwapEvents(swapEvents0to1, true);
   processSwapEvents(swapEvents1to0, false);
 
-  const dailySupplySideRevenue = dailyFees.clone(1, METRIC.SWAP_FEES)
-  dailySupplySideRevenue.subtract(dailyRevenue, METRIC.SWAP_FEES)
+  const dailySupplySideRevenue = dailyFees.clone(1, FLUID_DEX_METRICS.SwapFeesToSuppliers)
+  dailySupplySideRevenue.subtract(dailyRevenue, FLUID_DEX_METRICS.SwapFeesToSuppliers)
 
   return { 
     dailyVolume,
@@ -139,24 +149,22 @@ const methodology = {
 
 const breakdownMethodology = {
   Fees: {
-    [METRIC.SWAP_FEES]: 'Total swap fees paid by users.',
-  },
-  UserFees: {
-    [METRIC.SWAP_FEES]: 'Users pay fees per swap.',
+    [FLUID_DEX_METRICS.SwapFees]: 'Total swap fees paid by users.',
   },
   Revenue: {
-    [METRIC.SWAP_FEES]: 'Fluid takes a portion of swap fees.',
+    [FLUID_DEX_METRICS.SwapFeesToTreasury]: 'Fluid takes a portion of swap fees.',
   },
   ProtocolRevenue: {
-    [METRIC.SWAP_FEES]: 'Fluid takes a portion of swap fees.',
+    [FLUID_DEX_METRICS.SwapFeesToTreasury]: 'Fluid takes a portion of swap fees.',
   },
   SupplySideRevenue: {
-    [METRIC.SWAP_FEES]: 'Amount of swap fees distributed to LPs.',
+    [FLUID_DEX_METRICS.SwapFeesToSuppliers]: 'Amount of swap fees distributed to LPs.',
   },
 }
 
 const adapter: Adapter = {
   version: 2,
+  pullHourly: true,
   methodology,
   breakdownMethodology,
   adapter: {
@@ -164,6 +172,7 @@ const adapter: Adapter = {
     [CHAIN.ARBITRUM]: { fetch, start: '2024-12-23' },
     [CHAIN.POLYGON]: { fetch, start: '2025-04-03' },
     [CHAIN.BASE]: { fetch, start: '2025-05-22' },
+    [CHAIN.PLASMA]: { fetch, start: '2025-09-22' },
   },
 };
 

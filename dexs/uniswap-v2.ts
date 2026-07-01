@@ -1,150 +1,283 @@
-import * as sdk from "@defillama/sdk";
 import { CHAIN } from "../helpers/chains";
-import { getGraphDimensions2 } from "../helpers/getUniSubgraph";
-import { FetchOptions, SimpleAdapter } from "../adapters/types";
-import { httpGet } from "../utils/fetchURL";
-import { getStartTimestamp } from "../helpers/getStartTimestamp";
+import { Adapter, FetchOptions, FetchResultV2 } from "../adapters/types";
+import { getUniV2LogAdapter } from "../helpers/uniswap";
+import { queryClickhouse } from "../helpers/indexer";
+import { getDefaultDexTokensWhitelisted } from "../helpers/lists";
+import { Row } from "@clickhouse/client";
 
-const v2Endpoints = {
-  [CHAIN.ETHEREUM]: sdk.graph.modifyEndpoint('A3Np3RQbaBA6oKJgiwDJeo5T3zrYfGHPWFYayMwtNDum'),
-  [CHAIN.UNICHAIN]: sdk.graph.modifyEndpoint('8vvhJXc9Fi2xpc3wXtRpYrWVYfcxThU973HhBukmFh83'),
-  // [CHAIN.BASE]: sdk.graph.modifyEndpoint('4jGhpKjW4prWoyt5Bwk1ZHUwdEmNWveJcjEyjoTZWCY9'),
-};
+type Source = 'LOGS' | 'CLICKHOUSE';
 
-const blacklisted = {
-  [CHAIN.ETHEREUM]: [
-    '0x637f415687b7b2545ef2cd8dcc1614e1cc175850',
-    '0xb94acdf8662cd955f137e0c9c9fba535c87b57b4',
-    '0xb504035a11e672e12a099f32b1672b9c4a78b22f',
-    '0xf2a3ca198f2189263e09cd06d8a3a28a89ed1c64',
-    '0x4ef66e564e89a60041eebce4716e142626c2f2f4',
-    '0x62abdd605e710cc80a52062a8cc7c5d659dddbe7',
-    '0x72c1f19d653c2203ef71a89cf4892ef888bc2447',
-    '0xf07a660776be8cea92f8bf91fc2b482213d03f02',
-    '0xf2a3ca198f2189263e09cd06d8a3a28a89ed1c64',
-    '0x94799202f5f6915f2bf4535b8225c5329119ac21',
-    '0x9bd01d9db5e4d30f15e17de3ec6ef055863c8be5',
-    '0x0bee91533be2ede0936ea53457ce7bd9b0b398c6',
-    '0x4a6ba6d30ad3ac68509c1028fd74ebe0e9b2051b',
-    '0xaef4f384f460cc0039ee845671ee4955acca1603',
-    '0x1010d042fe2cb7f891b4dc79a47460d0a30dc795',
-    '0xe90c76ee994d09ae4c9d9d859df1f9741f5a2272',
-    '0xf53f1198bbc0311b389e7f29e697ae682a73e8da',
-    '0x8c8893849a700c60e90844d83d4246290e1d0188',
-    '0x5d154e68155da5765285874fc9ed1ca6ce5f3a2d',
-    '0x562866cd762ca778623cab07d56bc34d232d5094',
-    '0x17949ab06dab7e422d8d0cc99c50f99ad4bbce82',
-    '0xd4ae350a93a7e2633bf7f1035a4d044fd5d10a3b',
-    '0x8c93922ba3af98c98b1f02535babdbaf6179965b',
-    '0x16981398eca0f169bb55eb9c7c9380ddaab31d42',
-    '0x679a2338ec9ad300e8cb6d99df5ad9a9b1711db8',
-    '0x41d8287bc6289fa61fb91d0aaf440833834852ac',
-    '0x82595bf4076033b54e23e10e1d763b5e14e5984b',
-    '0x0fbb7d883e7c7606f1101b6c2d7b612685a05c93',
-    '0x3a0888db1faa64c55f340f8be4f0e366113bf098',
-    '0x98e1f56b334438e3f0bde22d92f5bfd746e0631f',
-    '0xa60f3f539ce84b93cacd94f519b8e001601fd428',
-    '0x5e474bcc7e64750f9aeced4e4c4b3777e8e7af37',
-    '0x94d8ed37c922aa76b14793576b37b44da1f76637',
-    '0x8f748aedae750cc4146e0493357778d2cf34c23f',
-    '0x0008a519b43d1dd0d81e08b4d569c769524e0593',
-    '0x76e222b07c53d28b89b0bac18602810fc22b49a8'
-  ]
+const chainConfig: Record<string, {
+  factory: string;
+  source: Source;
+  start: string;
+  feeSwitchDate?: string;
+}> = {
+  [CHAIN.ETHEREUM]: {
+    factory: '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+    source: 'CLICKHOUSE',
+    start: '2020-04-19',
+    feeSwitchDate: "2025-12-29",
+  },
+  [CHAIN.POLYGON]: {
+    factory: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
+    source: 'CLICKHOUSE',
+    start: '2024-02-12',
+    feeSwitchDate: "2026-06-02",
+  },
+  [CHAIN.BASE]: {
+    factory: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
+    source: 'CLICKHOUSE',
+    start: '2024-02-13',
+    feeSwitchDate: "2026-03-08",
+  },
+  [CHAIN.OPTIMISM]: {
+    factory: '0x0c3c1c532F1e39EdF36BE9Fe0bE1410313E074Bf',
+    source: 'LOGS',
+    start: '2024-02-13',
+    feeSwitchDate: "2026-03-08",
+  },
+  [CHAIN.ARBITRUM]: {
+    factory: '0xf1D7CC64Fb4452F05c498126312eBE29f30Fbcf9',
+    source: 'CLICKHOUSE',
+    start: '2024-02-08',
+    feeSwitchDate: "2026-03-08",
+  },
+  [CHAIN.BSC]: {
+    factory: '0x8909Dc15e40173Ff4699343b6eB8132c65e18eC6',
+    source: 'CLICKHOUSE',
+    start: '2024-02-14',
+    feeSwitchDate: "2026-06-02",
+  },
+  [CHAIN.UNICHAIN]: {
+    factory: '0x1f98400000000000000000000000000000000002',
+    source: 'CLICKHOUSE',
+    start: '2025-01-24',
+  },
+  [CHAIN.AVAX]: {
+    factory: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
+    source: 'CLICKHOUSE',
+    start: '2024-02-15',
+  },
+  [CHAIN.BLAST]: {
+    factory: '0x5C346464d33F90bABaf70dB6388507CC889C1070',
+    source: 'CLICKHOUSE',
+    start: '2024-03-24',
+  },
+  [CHAIN.ZORA]: {
+    // Zora isn't in evm_indexer, so fall back to the RPC-backed LOGS path.
+    factory: '0x0F797dC7efaEA995bB916f268D919d0a1950eE3C',
+    source: 'LOGS',
+    start: '2024-02-27',
+    feeSwitchDate: "2026-03-08",
+  },
+  [CHAIN.MONAD]: {
+    factory: '0x182a927119d56008d921126764bf884221b10f59',
+    source: 'LOGS',
+    start: '2025-11-24',
+  },
+  [CHAIN.TEMPO]: {
+    factory: '0xf9ec577a4e45b5278bb7cf60fcbc20c3acaef68f',
+    source: 'LOGS',
+    start: '2026-03-23',
+  },
+  [CHAIN.XLAYER]: {
+    factory: '0xDf38F24fE153761634Be942F9d859f3DBA857E95',
+    source: 'CLICKHOUSE',
+    start: '2026-01-05',
+    feeSwitchDate: "2026-03-08",
+  },
 }
 
-const v2Graph = getGraphDimensions2({
-  graphUrls: v2Endpoints,
-  feesPercent: {
-    type: "volume",
-    Fees: 0.3,
-    UserFees: 0.3,
-    Revenue: 0,
-    SupplySideRevenue: 0.3,
-    ProtocolRevenue: 0,
-    HoldersRevenue: 0,
-  },
-  blacklistTokens: blacklisted
-});
+function getLogAdapterConfig(options: FetchOptions) {
+  // UNIfication has officially been executed onchain
+  // https://x.com/Uniswap/status/2005018127260942798
+  const feeSwitchDate = chainConfig[options.chain]?.feeSwitchDate;
+  if (feeSwitchDate && options.dateString >= feeSwitchDate) {
+    return {
+      userFeesRatio: 1,
+      revenueRatio: 0, // Tracked combined in Uniswap V3 adapter
+      protocolRevenueRatio: 0,
+    }
+  } else {
+    return {
+      userFeesRatio: 1,
+      revenueRatio: 0,
+      protocolRevenueRatio: 0,
+    }
+  }
+}
+
+// --- ClickHouse (evm_indexer) helpers ---
+
+// keccak256("PairCreated(address,address,address,uint256)")
+const PAIR_CREATED_TOPIC0 = '0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9';
+const PAIR_CREATED_SHORT_TOPIC0 = '0x0d3648bd';
+
+// keccak256("Swap(address,uint256,uint256,uint256,uint256,address)")
+const SWAP_TOPIC0 = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822';
+const SWAP_SHORT_TOPIC0 = '0xd78ad95f';
+
+const shortAddrOf = (addr: string) => addr.substring(0, 10).toLowerCase();
+const padTokenTo32Bytes = (addr: string) =>
+  '0x000000000000000000000000' + addr.replace(/^0x/, '').toLowerCase();
+const unpadTopic = (t: string) => '0x' + String(t).slice(-40).toLowerCase();
+
+const hexLiteral = (s: string, expectedHexChars: number): string => {
+  if (!new RegExp(`^0x[0-9a-f]{${expectedHexChars}}$`).test(s)) {
+    throw new Error(`Invalid hex literal (expected 0x + ${expectedHexChars} hex chars): ${s}`);
+  }
+  return `'${s}'`;
+};
+const hexListSql = (arr: string[], expectedHexChars: number): string =>
+  arr.map(x => hexLiteral(x.toLowerCase(), expectedHexChars)).join(', ');
+
+// Find pairs where both token0 and token1 are in the whitelist. Returns the
+// pair address and indexed (32-byte-padded) token0/token1 from PairCreated.
+// Whitelist is wrapped in a WITH clause so it materializes once for both
+// topic1/topic2 has() checks. max_query_size is bumped at the call site via
+// HTTP clickhouse_settings (in-SQL SETTINGS is parsed too late to help).
+const buildDiscoverPairsSql = (chainId: number, factory: string, paddedTokens: string[]): string => `
+  WITH [${hexListSql(paddedTokens, 64)}] AS whitelist
+  SELECT
+    topic1 AS token0_padded,
+    topic2 AS token1_padded,
+    concat('0x', substring(data, 27, 40)) AS pair
+  FROM evm_indexer.logs
+  PREWHERE chain = ${chainId}
+    AND short_address = '${shortAddrOf(factory)}'
+    AND short_topic0 = '${PAIR_CREATED_SHORT_TOPIC0}'
+    AND address = '${factory}'
+    AND topic0 = '${PAIR_CREATED_TOPIC0}'
+    AND has(whitelist, topic1)
+    AND has(whitelist, topic2)
+`;
+
+// Sum amount0Out / amount1Out per pair from the V2 Swap event payload. data is
+// "0x" + four uint256 (amount0In, amount1In, amount0Out, amount1Out); amount0Out
+// occupies hex chars 131..194 and amount1Out 195..258. PREWHERE order matches
+// the `logs_fast_lookup` projection layout (chain, short_address, short_topic0).
+const buildSwapAggSql = (
+  chainId: number,
+  shortAddresses: string[],
+  addresses: string[],
+  fromTs: number,
+  toTs: number,
+): string => `
+  SELECT
+    address AS pair,
+    toString(SUM(reinterpretAsUInt256(reverse(unhex(substring(data, 131, 64)))))) AS amount0_out,
+    toString(SUM(reinterpretAsUInt256(reverse(unhex(substring(data, 195, 64)))))) AS amount1_out
+  FROM evm_indexer.logs
+  PREWHERE chain = ${chainId}
+    AND short_address IN (${hexListSql(shortAddresses, 8)})
+    AND short_topic0 = '${SWAP_SHORT_TOPIC0}'
+    AND address IN (${hexListSql(addresses, 40)})
+    AND topic0 = '${SWAP_TOPIC0}'
+    AND timestamp >= toDateTime(${fromTs})
+    AND timestamp <  toDateTime(${toTs})
+  GROUP BY address
+`;
+
+type PairRow = Row & { pair: string; token0_padded: string; token1_padded: string };
+type SwapAggRow = Row & { pair: string; amount0_out: string; amount1_out: string };
+
+async function fetchClickhouse(options: FetchOptions, config: typeof chainConfig[string]): Promise<FetchResultV2> {
+  const dailyVolume = options.createBalances();
+  const feeRates = getLogAdapterConfig(options);
+
+  const emptyResult = (): FetchResultV2 => {
+    const dailyFees = dailyVolume.clone(0.003);
+    return {
+      dailyVolume,
+      dailyFees,
+      dailyUserFees: dailyFees,
+      dailySupplySideRevenue: dailyFees, // Revenue share subtracted in Uniswap V3 adapter
+      dailyRevenue: 0, // Tracked combined in Uniswap V3 adapter
+      dailyProtocolRevenue: 0,
+    };
+  };
+
+  const whitelistedTokens = (await getDefaultDexTokensWhitelisted({ chain: options.chain })).map(t => t.toLowerCase());
+  if (whitelistedTokens.length === 0) return emptyResult();
+
+  const chSettings = { max_query_size: 4194304 } as const;
+  const chainId = Number(options.api.chainId);
+
+  // Step 1: discover whitelisted V2 pairs
+  const pairRows = await queryClickhouse<PairRow>(
+    buildDiscoverPairsSql(chainId, config.factory.toLowerCase(), whitelistedTokens.map(padTokenTo32Bytes)),
+    undefined,
+    chSettings,
+  );
+  if (pairRows.length === 0) return emptyResult();
+
+  const pairToTokens: Record<string, { token0: string; token1: string }> = {};
+  for (const row of pairRows) {
+    const pair = String(row.pair).toLowerCase();
+    pairToTokens[pair] = {
+      token0: unpadTopic(row.token0_padded),
+      token1: unpadTopic(row.token1_padded),
+    };
+  }
+  const pairAddresses = Object.keys(pairToTokens);
+  const shortAddresses = Array.from(new Set(pairAddresses.map(shortAddrOf)));
+
+  // Step 2: aggregate per-pair Swap event amount-out for the day
+  const swapRows = await queryClickhouse<SwapAggRow>(
+    buildSwapAggSql(chainId, shortAddresses, pairAddresses, options.fromTimestamp, options.toTimestamp),
+    undefined,
+    chSettings,
+  );
+
+  for (const row of swapRows) {
+    const tokens = pairToTokens[String(row.pair).toLowerCase()];
+    if (!tokens) continue;
+    dailyVolume.add(tokens.token0, row.amount0_out);
+    dailyVolume.add(tokens.token1, row.amount1_out);
+  }
+
+  const dailyFees = dailyVolume.clone(0.003);
+  return {
+    dailyVolume,
+    dailyFees,
+    dailyUserFees: dailyFees,
+    dailySupplySideRevenue: dailyFees, // Revenue share subtracted in Uniswap V3 adapter
+    dailyRevenue: 0, // Tracked combined in Uniswap V3 adapter
+    dailyProtocolRevenue: 0,
+  };
+}
+
+const fetch = async (options: FetchOptions) => {
+  const config = chainConfig[options.chain];
+  if (!config) {
+    throw Error(`config not found for chain ${options.chain}`);
+  }
+
+  if (config.source === 'LOGS') {
+    const fetchFunction = getUniV2LogAdapter({ factory: config.factory, ...getLogAdapterConfig(options), allowReadPairs: options.chain === CHAIN.ZORA });
+    return await fetchFunction(options);
+  } else if (config.source === 'CLICKHOUSE') {
+    return await fetchClickhouse(options, config);
+  } else {
+    throw Error(`source not found for chain ${options.chain}`);
+  }
+}
 
 const methodology = {
   Fees: "User pays 0.3% fees on each swap.",
   UserFees: "User pays 0.3% fees on each swap.",
-  Revenue: 'Protocol make no revenue.',
+  Revenue: 'From 28 Dec 2025, 17% (0% before) fees on Ethereum, From 8 Mar 2026, 17% (0% before) fees on Optimism, Arbitrum, Base, Zora, XLayer chains shared to buy back and burn UNI. (Tracked combined in Uniswap V3 adapter)',
   ProtocolRevenue: 'Protocol make no revenue.',
-  SupplySideRevenue: 'All fees are distributed to LPs.',
-  HoldersRevenue: 'No revenue for UNI holders.',
+  SupplySideRevenue: '83% (100% before fee switch) of fees are distributed to liquidity providers.',
+  HoldersRevenue: 'From 28 Dec 2025, 17% (0% before) fees on Ethereum shared to buy back and burn UNI, From 8 Mar 2026, 17% (0% before) fees on Optimism, Arbitrum, Base, Zora, XLayer chains shared to buy back and burn UNI (Tracked combined in Uniswap V3 adapter)',
 }
 
-const chainv2mapping: any = {
-  [CHAIN.ARBITRUM]: "ARBITRUM",
-  [CHAIN.ETHEREUM]: "ETHEREUM",
-  [CHAIN.POLYGON]: "POLYGON",
-  [CHAIN.BSC]: "BNB",
-  [CHAIN.UNICHAIN]: "UNI",
-  [CHAIN.BASE]: "BASE",
-  // [CHAIN.OPTIMISM]: "OPTIMISM",
-}
-
-async function fetchV2Volume(_t:any, _tb: any , options: FetchOptions) {
-  const { api } = options
-  const endpoint = `https://interface.gateway.uniswap.org/v2/uniswap.explore.v1.ExploreStatsService/ExploreStats?connect=v1&encoding=json&message=%7B%22chainId%22%3A%22${api.chainId}%22%7D`
-  const res = await httpGet(endpoint, {
-    headers: {
-      'accept': '*/*',
-      'accept-language': 'th,en-US;q=0.9,en;q=0.8',
-      'cache-control': 'no-cache',
-      'content-type': 'application/json',
-      'origin': 'https://app.uniswap.org',
-      'pragma': 'no-cache',
-      'priority': 'u=1, i',
-      'referer': 'https://app.uniswap.org/',
-      'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-      'sec-ch-ua-mobile': '?0',
-      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    }
-  })
-  const dailyVolume = res.stats.historicalProtocolVolume.Month.v2
-    .find((item: any) => item.timestamp === options.startOfDay)?.value;
-  return { dailyVolume, dailyFees: Number(dailyVolume) * 0.003, dailyUserFees: Number(dailyVolume) * 0.003, dailySupplySideRevenue: Number(dailyVolume) * 0.003, dailyRevenue: 0, dailyProtocolRevenue: 0, dailyHoldersRevenue: 0 }
-}
-
-const adapter: SimpleAdapter = {
+const adapter: Adapter = {
   version: 1,
+  fetch,
+  adapter: chainConfig,
   methodology,
-  adapter: {
-    [CHAIN.ETHEREUM]: {
-      fetch: async (_t:any, _tb: any , options: FetchOptions) => {
-        const response = await v2Graph(options);
-        return {
-          ...response,
-          dailyUserFees: response.dailyFees,
-        }
-      },
-      start: getStartTimestamp({
-        endpoints: v2Endpoints,
-        chain: CHAIN.ETHEREUM,
-      }),
-    },
-    [CHAIN.BASE]: {
-      fetch: async (_t:any, _tb: any , options: FetchOptions) => {
-        const response = await v2Graph(options);
-        return {
-          ...response,
-          dailyUserFees: response.dailyFees,
-        }
-      },
-      start: getStartTimestamp({
-        endpoints: v2Endpoints,
-        chain: CHAIN.BASE,
-      }),
-    },
-    ...Object.keys(chainv2mapping).reduce((acc: any, chain) => {
-      acc[chain] = {
-        fetch: fetchV2Volume,
-      }
-      return acc
-    }, {})
-  }
 }
 
 export default adapter

@@ -1,8 +1,8 @@
 import { CHAIN } from "../../helpers/chains";
-import { FetchOptions } from "../../adapters/types";
+import { Dependencies, FetchOptions } from "../../adapters/types";
 import { queryDuneSql } from "../../helpers/dune";
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
   const data = await queryDuneSql(
     options,
     `
@@ -40,10 +40,11 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: any = {
   version: 1,
+  dependencies: [Dependencies.DUNE],
   fetch,
   start: "2025-03-14",
   methodology: {
-    dailyVolume:
+    Volume:
       "Volume is calculated by summing the USD volume of all trades routed through the DeDust aggregator that day.",
   },
   chains: [CHAIN.TON],

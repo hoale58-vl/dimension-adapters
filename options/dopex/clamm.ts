@@ -2,7 +2,7 @@ import { request, gql } from "graphql-request";
 
 interface IGetChainStatsParams {
   graphUrl: string;
-  timestamp: string;
+  timestamp: number;
 }
 
 interface IQueryResponse {
@@ -66,7 +66,6 @@ async function getChainStats({ graphUrl, timestamp }: IGetChainStatsParams) {
   );
 
   return {
-    timestamp: dayStart.toString(),
     ...daily,
     dailyFees: daily.dailyRevenue,
   };

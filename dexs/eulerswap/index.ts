@@ -1,4 +1,4 @@
-import { Adapter, FetchOptions } from "../../adapters/types";
+import { Adapter, Dependencies, FetchOptions } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { getSqlFromFile, queryDuneSql } from "../../helpers/dune";
 
@@ -16,7 +16,7 @@ const prefetch = async (options: FetchOptions) => {
     return await queryDuneSql(options, sql);
 }
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const results = options.preFetchedResults || [];
     const chainData = results.find(item => item.chain === options.chain.toLowerCase());
 
@@ -54,7 +54,8 @@ const methodology = {
 const adapter: Adapter = {
     version: 1,
     fetch,
-    chains: [CHAIN.ETHEREUM, CHAIN.UNICHAIN, CHAIN.BSC],
+    dependencies: [Dependencies.DUNE],
+    chains: [CHAIN.ETHEREUM, CHAIN.UNICHAIN, CHAIN.BSC, CHAIN.MONAD],
     start: '2025-06-05',
     methodology,
     prefetch,

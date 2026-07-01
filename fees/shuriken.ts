@@ -1,43 +1,16 @@
 import ADDRESSES from '../helpers/coreAssets.json'
 // source: https://dune.com/queries/4043813/6866844
 
-import { FetchOptions, FetchResultFees, SimpleAdapter } from "../adapters/types";
+import { Dependencies, FetchOptions, FetchResultFees, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
-import { queryIndexer } from "../helpers/indexer";
 import { queryDuneSql } from "../helpers/dune";
 
-const fetch = async (timestamp: number, _: any, options: FetchOptions): Promise<FetchResultFees> => {
-  const dailyFees = options.createBalances();
-  const transfer_txs = await queryIndexer(`
-      SELECT
-          block_time,
-          encode(transaction_hash, 'hex') AS HASH,
-          encode(data, 'hex') AS data
-      FROM
-          ethereum.event_logs
-      WHERE
-          block_number > 18332267
-          AND contract_address IN (
-              SELECT DISTINCT address
-              FROM ethereum.traces
-              WHERE
-                  block_number > 18332267
-                  AND from_address IN ('\\x28B108B9932dD9E26103b9d3ed1999d3087F537d')
-                  AND "type" = 'create'
-          )
-          AND topic_0 = '\\x9377d2ca0fa4b8097cf0c9128e900f40fc24811a43eefb75da59072dbbcc8c85'
-          AND block_time BETWEEN llama_replace_date_range;
-          `, options);
-
-  transfer_txs.map((e: any) => {
-    const amount = Number('0x' + e.data.slice((5 * 64), (5 * 64) + 64))
-    dailyFees.addGasToken(amount);
-  })
-
-  return { dailyFees, dailyRevenue: dailyFees, timestamp }
+const fetch = async (): Promise<FetchResultFees> => {
+  return {} // stop using indexa db
 }
 
-const fetchSolana = async (_: any, _1: any, options: FetchOptions) => {
+const fetchSolana = async (options: FetchOptions) => {
+  throw new Error('This returns empty, no point running it')
   const dailyFees = options.createBalances();
 
   const query = `
@@ -50,18 +23,32 @@ const fetchSolana = async (_: any, _1: any, options: FetchOptions) => {
         solana.account_activity
       WHERE
         TIME_RANGE
-        AND address = '9cSuF94JWPb1HQzWMcifJzkoggwAtfjsojcUqny5XuJy'
+        AND address IN (
+          '9cSuF94JWPb1HQzWMcifJzkoggwAtfjsojcUqny5XuJy',
+          'shuvodtwMMFFB6KmqCDYaiAe1hRokCVwr4LkT1pLAL5'
+        )
         AND tx_success
         AND balance_change > 0 
+    ),
+    botTrades AS (
+      SELECT
+        trades.tx_id,
+        MAX(fee_token_amount) AS fee
+      FROM
+        dex_solana.trades AS trades
+        JOIN allFeePayments AS feePayments ON trades.tx_id = feePayments.tx_id
+      WHERE
+        TIME_RANGE
+        AND trades.trader_id not IN (
+          '9cSuF94JWPb1HQzWMcifJzkoggwAtfjsojcUqny5XuJy',
+          'shuvodtwMMFFB6KmqCDYaiAe1hRokCVwr4LkT1pLAL5'
+        )
+      GROUP BY trades.tx_id
     )
     SELECT
-      SUM(fee_token_amount) AS fee
+      SUM(fee) AS fee
     FROM
-      dex_solana.trades AS trades
-      JOIN allFeePayments AS feePayments ON trades.tx_id = feePayments.tx_id
-    WHERE
-      TIME_RANGE
-      AND trades.trader_id != '9cSuF94JWPb1HQzWMcifJzkoggwAtfjsojcUqny5XuJy'
+      botTrades
   `;
 
   const fees = await queryDuneSql(options, query);
@@ -72,6 +59,7 @@ const fetchSolana = async (_: any, _1: any, options: FetchOptions) => {
 
 const adapter: SimpleAdapter = {
   version: 1,
+  dependencies: [Dependencies.DUNE],
   adapter: {
     [CHAIN.ETHEREUM]: {
       fetch: fetch as any,

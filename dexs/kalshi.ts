@@ -1,22 +1,51 @@
-import { FetchOptions } from "../adapters/types";
+import { Dependencies, FetchOptions, SimpleAdapter } from "../adapters/types";
 import { CHAIN } from "../helpers/chains";
-import { httpGet } from "../utils/fetchURL";
+import { queryDuneSql } from "../helpers/dune";
 
-async function historicFetch(options: FetchOptions) {
-  const data = await httpGet(`https://kalshi-public-docs.s3.amazonaws.com/reporting/market_data_${options.dateString}.json`)
-  let dailyVolume = 0
-  let openInterestAtEnd = 0
-  for (const market of data) {
-    dailyVolume += market.daily_volume
-    openInterestAtEnd += market.open_interest
-  }
-  return { dailyVolume, openInterestAtEnd }
+async function fetch(options: FetchOptions) {
+  // const data = await fetchURL(`https://kalshi-public-docs.s3.amazonaws.com/reporting/market_data_${options.dateString}.json`)
+  const dateString = new Date((options.startOfDay - (24 * 3600)) * 1000).toISOString().split('T')[0]
+  
+  const query = `
+  WITH trade_report_agg AS (
+    SELECT 
+      SUM(price * contracts_traded / 100) AS cash_volume
+    FROM kalshi.trade_report
+    WHERE date = '${dateString}'
+  ),
+  market_report_agg AS (
+    SELECT 
+      SUM(CASE WHEN status = 'active' THEN open_interest ELSE 0 END) AS open_interest,
+      SUM(daily_volume) AS notional_volume
+    FROM kalshi.market_report 
+    WHERE date = '${dateString}'
+  )
+  SELECT 
+    tr.cash_volume,
+    mr.open_interest,
+    mr.notional_volume
+  FROM trade_report_agg tr
+  CROSS JOIN market_report_agg mr
+  `
+  const data: { 
+    cash_volume: string,
+    open_interest: string,
+    notional_volume: string,
+  }[] = await queryDuneSql(options, query)
+  
+  const dailyVolume = Number(data[0]?.cash_volume) || 0
+  const openInterestAtEnd = Number(data[0]?.open_interest) || 0
+  const dailyNotionalVolume = Number(data[0]?.notional_volume) || 0
+
+  return { dailyVolume, openInterestAtEnd, dailyNotionalVolume }
 }
 
-export default {
+const adapter: SimpleAdapter = {
+  fetch,
+  chains: [CHAIN.OFF_CHAIN],
   start: '2021-06-30',
-  chains: [CHAIN.KALSHI],
-  fetch: async (_: any, _1: any, options: FetchOptions) => {
-    return historicFetch(options)
-  }
+  dependencies: [Dependencies.DUNE],
+  isExpensiveAdapter: true,
 }
+
+export default adapter;

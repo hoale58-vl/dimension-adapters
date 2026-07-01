@@ -1,6 +1,6 @@
 import ADDRESSES from '../../helpers/coreAssets.json'
 import { FetchOptions, SimpleAdapter } from "../../adapters/types";
-import { HaikuAddreses } from "../../helpers/aggregators/haiku";
+import { HaikuChainConfig } from "../../helpers/aggregators/haiku";
 
 const HaikuExecutedEvent =
   "event Executed(address indexed user, address indexed agent)";
@@ -13,7 +13,7 @@ const nativeToken = ADDRESSES.GAS_TOKEN_2;
 const fetch = async (options: FetchOptions) => {
   const dailyFees = options.createBalances();
   const data: any[] = await options.getLogs({
-    target: HaikuAddreses[options.chain].id,
+    target: HaikuChainConfig[options.chain].id,
     eventAbi: HaikuExecutedEvent,
   });
 
@@ -43,20 +43,14 @@ const fetch = async (options: FetchOptions) => {
 
 const adapter: SimpleAdapter = {
   version: 2,
+  pullHourly: true,
   methodology: {
     Fees: "All fees paid by users for swap and bridge tokens via Haiku.",
     Revenue: "Fees are distributed to Haiku.",
     ProtocolRevenue: "Fees are distributed to Haiku.",
   },
   fetch,
-  adapter: Object.keys(HaikuAddreses).reduce((acc, chain) => {
-    return {
-      ...acc,
-      [chain]: {
-        start: HaikuAddreses[chain].startTime,
-      },
-    };
-  }, {}),
+  adapter: HaikuChainConfig
 };
 
 export default adapter;

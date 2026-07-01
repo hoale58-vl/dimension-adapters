@@ -49,18 +49,22 @@ const chains: Record<string, string> = {
   [CHAIN.SONEIUM]: 'soneium',
   [CHAIN.GRAVITY]: 'gravity',
   [CHAIN.ROOTSTOCK]: 'rootstock',
-  [CHAIN.KROMA]: 'kroma',
+  // [CHAIN.KROMA]: 'kroma',
   [CHAIN.XLAYER]: 'xlayer',
   [CHAIN.SEI]: 'sei',
-  [CHAIN.EON]: 'horizen-eon',
+  // [CHAIN.EON]: 'horizen-eon',   // chain is dead
   [CHAIN.BAHAMUT]: 'bahamut',
   [CHAIN.KLAYTN]: 'klaytn',
   // [CHAIN.ASTAR_ZKEVM]: 'astar-evm',
   [CHAIN.VELAS]: 'velas',
   [CHAIN.SYSCOIN]: 'syscoin',
-  [CHAIN.BOBA_BNB]: 'boba-bsc',
+  // [CHAIN.BOBA_BNB]: 'boba-bsc',
   [CHAIN.FLARE]: 'flare',
-  [CHAIN.HEMI]: 'hemi'
+  [CHAIN.HEMI]: 'hemi',
+  [CHAIN.MONAD]: 'monad',
+  [CHAIN.MEGAETH]: 'megaeth',
+  [CHAIN.PLASMA]: 'plasma',
+  [CHAIN.HYPERLIQUID]: 'hyper-evm',
 };
 
 interface ApiResponse {
@@ -85,7 +89,7 @@ const fetch = async (options: FetchOptions): Promise<FetchResult> => {
 };
 
 const adapter: SimpleAdapter = {
-  version: 2,
+  version: 1,
   adapter: {
     ...Object.entries(chains).reduce((acc, [key]) => {
       return {

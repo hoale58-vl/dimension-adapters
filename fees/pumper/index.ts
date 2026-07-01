@@ -1,5 +1,5 @@
 import ADDRESSES from "../../helpers/coreAssets.json";
-import { FetchOptions, SimpleAdapter } from "../../adapters/types";
+import { Dependencies, FetchOptions, SimpleAdapter } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { queryDuneSql } from "../../helpers/dune";
 
@@ -11,7 +11,7 @@ const USDC_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const PROTOCOL_FEE_TYPE = "protocol";
 const REFERRER_FEE_TYPE = "referrer";
 
-const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch: any = async (options: FetchOptions) => {
   const query = `
       WITH
       fee_txs AS (
@@ -102,20 +102,17 @@ const fetch: any = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: SimpleAdapter = {
   version: 1,
-  adapter: {
-    [CHAIN.SOLANA]: {
-      fetch: fetch,
-      start: START_DATE,
-    },
-  },
+  fetch,
+  chains: [CHAIN.SOLANA],
+  dependencies: [Dependencies.DUNE],
+  start: START_DATE,
   methodology: {
     Fees: "All trading fees collected from users.",
-    Revenue:
-      "All protocol fees collected from trading and withdrawals. Does not include referral fees.",
-    ProtocolRevenue:
-      "All protocol fees collected from trading and withdrawals. Does not include referral fees.",
+    Revenue: "All protocol fees collected from trading and withdrawals. Does not include referral fees.",
+    ProtocolRevenue: "All protocol fees collected from trading and withdrawals. Does not include referral fees.",
   },
   isExpensiveAdapter: true,
+  deadFrom: "2025-12-31", //operations shut down
 };
 
 export default adapter;

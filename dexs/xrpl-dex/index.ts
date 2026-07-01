@@ -1,8 +1,8 @@
 import { CHAIN } from "../../helpers/chains";
-import { FetchOptions } from "../../adapters/types";
+import { Dependencies, FetchOptions } from "../../adapters/types";
 import { queryDuneSql } from "../../helpers/dune";
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const date = new Date(options.fromTimestamp * 1000);
     const formattedDate = date.toISOString().split("T")[0];
 
@@ -20,6 +20,7 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 
 const adapter: any = {
     fetch,
+    dependencies: [Dependencies.DUNE],
     chains: [CHAIN.RIPPLE],
     start: '2025-03-19',
 };

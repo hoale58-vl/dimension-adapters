@@ -1,8 +1,8 @@
-import { FetchOptions, FetchResult, } from "../../adapters/types";
+import { Dependencies, FetchOptions, FetchResult, } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { queryDuneSql } from "../../helpers/dune";
 
-const fetch = async (_1: any, _2: any, options: FetchOptions): Promise<FetchResult> => {
+const fetch = async (options: FetchOptions): Promise<FetchResult> => {
   const query = `
     WITH table_a AS (
         SELECT
@@ -49,6 +49,7 @@ const fetch = async (_1: any, _2: any, options: FetchOptions): Promise<FetchResu
 
 const adapter: any = {
   version: 1,
+  dependencies: [Dependencies.DUNE],
   adapter: {
     [CHAIN.APTOS]: {
       fetch: fetch,

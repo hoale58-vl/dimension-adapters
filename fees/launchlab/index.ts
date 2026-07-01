@@ -1,4 +1,4 @@
-import { SimpleAdapter } from "../../adapters/types";
+import { Dependencies, SimpleAdapter } from "../../adapters/types";
 import { CHAIN } from "../../helpers/chains";
 import { queryDuneSql } from "../../helpers/dune";
 import { FetchOptions } from "../../adapters/types";
@@ -7,7 +7,7 @@ interface IData {
     protocol_fees: number;
 }
 
-const fetch = async (_a: any, _b: any, options: FetchOptions) => {
+const fetch = async (options: FetchOptions) => {
     const data: IData[] = await queryDuneSql(options, `
         WITH launchlab_trades AS (
             SELECT
@@ -40,12 +40,10 @@ const fetch = async (_a: any, _b: any, options: FetchOptions) => {
 };
 
 const adapter: SimpleAdapter = {
-    adapter: {
-        [CHAIN.SOLANA]: {
-            fetch,
-            start: '2025-04-15',
-        }
-    },
+    fetch,
+    chains: [CHAIN.SOLANA],
+    dependencies: [Dependencies.DUNE],
+    start: '2025-04-15',
     version: 1,
     isExpensiveAdapter: true,
     methodology: {

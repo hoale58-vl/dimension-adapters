@@ -1,9 +1,80 @@
-import { getBuilderExports } from "../../helpers/orderly";
+import { FetchOptions, SimpleAdapter } from "../../adapters/types";
+import { CHAIN } from "../../helpers/chains";
+import fetchURL from "../../utils/fetchURL";
 
-const methodology = {
-  Fees: "Builder Fees collected from Orderly Network(0.3 bps on taker volume).",
-  Revenue: "0.3 bps trading fees on taker volume, 0 on maker volume",
-  ProtocolRevenue: "All the revenue go to the protocol",
+// // Previously it was Orderly Network(0.4 bps on taker volume) and Aster Exchange(0.4 bps on taker volume)
+
+// let asterBuilderData: any = null
+// async function asterFetch({ dateString }: FetchOptions) {
+//   const asterVolumeEndpoint = "https://fapi.asterdex.com/fapi/v1/statisticsData/adenTradingInfo?period=DAILy";
+//   if (!asterBuilderData) asterBuilderData = httpGet(asterVolumeEndpoint).then(({ perps: data }) => {
+//     const dateDataMap: any = {}
+//     data.forEach((i: any) => {
+//       dateDataMap[i.dateString] = i
+//     })
+//     return dateDataMap
+//   })
+//   const data = (await asterBuilderData)[dateString]
+//   if (!data)
+//     throw new Error('Data missing for date: ' + dateString)
+//   const dailyVolume = +data.takerVolume + +data.makerVolume
+//   const dailyFees = +data.builderFee
+//   const response: any = { dailyVolume, dailyFees, dailyRevenue: dailyFees, dailyProtocolRevenue: dailyFees, dailyHoldersRevenue: 0 }
+//   return response
+// }
+
+async function fetch(options: FetchOptions): Promise<any> {
+  if (options.chain !== CHAIN.GATE_LAYER) {
+    return {
+      dailyVolume: 0,
+      dailyFees: 0,
+      dailyRevenue: 0,
+      dailyProtocolRevenue: 0,
+    };
+  }
+
+  const endpointWithDate = `https://api.gateperps.com/api/v4/dex_futures/usdt/contract_stats/defillama?date=${options.dateString}&broken=aden`;
+
+  const data = await fetchURL(endpointWithDate);
+
+  if (!data) {
+    throw new Error("Data missing for date: " + options.dateString);
+  }
+
+  const dailyFees = options.createBalances();
+  const dailyVolume = options.createBalances();
+  dailyFees.addUSDValue(Number(data.fees), "Builder fees");
+  dailyVolume.addUSDValue(Number(data.volume));
+
+  return {
+    dailyVolume: data.volume,
+    dailyFees,
+    dailyRevenue: dailyFees,
+    dailyProtocolRevenue: dailyFees,
+  };
 }
 
-export default getBuilderExports({ broker_id: 'aden', start: '2025-07-14', methodology });
+const methodology = {
+  Fees: "Builder Fees collected from Gate Layer Network(0.4 bps on taker volume)",
+  Revenue: "All the fees collected",
+  ProtocolRevenue: "All the revenue go to the protocol",
+};
+
+const breakdownMethodology = {
+  Fees: {
+    "Builder fees":
+      "Fees collected from perpetual trading on Gate Layer Network, charged at 0.4 basis points on taker volume",
+  },
+};
+
+const adapter: SimpleAdapter = {
+  version: 1,
+  fetch,
+  chains: [CHAIN.GATE_LAYER, CHAIN.ORDERLY, CHAIN.OFF_CHAIN],
+  doublecounted: true,
+  start: "2025-07-19",
+  methodology,
+  breakdownMethodology,
+};
+
+export default adapter;
